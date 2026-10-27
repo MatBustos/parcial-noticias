@@ -126,7 +126,7 @@ const joseDeZer = new Periodista(
   preferencia = titulosConT
 )
 
-object diario {
+class Diario {
   const periodistas = []
   
   method periodistasRecientesQuePublicaronEnLaUltimaSemana() = periodistas.filter(

@@ -1,0 +1,220 @@
+import noticias.*
+
+object fabrica {
+  method articulo(grado, fecha, links) = new ArticuloComun(
+    fechaDePublicacion = fecha,
+    publicador = null,
+    gradoDeImportancia = grado,
+    titulo = "Una noticia",
+    desarrollo = "Texto de desarrollo.",
+    links = links
+  )
+  
+  method chivo(plata) = new Chivo(
+    fechaDePublicacion = new Date(),
+    publicador = null,
+    gradoDeImportancia = 9,
+    titulo = "Una noticia",
+    desarrollo = "Texto de desarrollo.",
+    productoPromocionado = "Un producto",
+    costoMonetarioDeLaNoticia = plata
+  )
+  
+  method reportaje(persona) = new Reportaje(
+    fechaDePublicacion = new Date(),
+    publicador = null,
+    gradoDeImportancia = 9,
+    titulo = "Una noticia",
+    desarrollo = "Texto de desarrollo.",
+    personaEntrevistada = persona
+  )
+  
+  method cobertura(noticias) = new Cobertura(
+    fechaDePublicacion = new Date(),
+    publicador = null,
+    gradoDeImportancia = 9,
+    titulo = "Una noticia",
+    desarrollo = "Texto de desarrollo.",
+    serieDeNoticiasRelacionadas = noticias
+  )
+  
+  method relleno() = self.chivo(1)
+}
+
+describe "punto 1 - si una noticia es copada" {
+  test "el chivo necesita mas de 2M, estricto" {
+    assert.notThat(fabrica.chivo(2000000).esCopada())
+    assert.that(fabrica.chivo(2000001).esCopada())
+  }
+  
+  test "hace menos de 3 dias incluye hasta 2 dias atras" {
+    const reciente = fabrica.articulo(
+      9,
+      new Date().minusDays(2),
+      [fabrica.relleno(), fabrica.relleno()]
+    )
+    const vieja = fabrica.articulo(
+      9,
+      new Date().minusDays(3),
+      [fabrica.relleno(), fabrica.relleno()]
+    )
+    
+    assert.that(reciente.esCopada())
+    assert.notThat(vieja.esCopada())
+  }
+  
+  test "el reportaje es copado si su nombre tiene cantidad de letras impar" {
+    assert.that(fabrica.reportaje("Los Auténticos Decadentes").esCopada())
+    assert.notThat(fabrica.reportaje("Los Auténticos").esCopada())
+  }
+  
+  test "la cobertura se copa solo si todas sus noticias lo son" {
+    assert.notThat(
+      fabrica.cobertura([fabrica.chivo(3000000), fabrica.chivo(10)]).esCopada()
+    )
+    assert.that(
+      fabrica.cobertura(
+        [fabrica.chivo(3000000), fabrica.reportaje("Los Auténticos Decadentes")]
+      ).esCopada()
+    )
+    assert.that(fabrica.cobertura([]).esCopada())
+  }
+}
+
+describe "punto 2 - preferencias" {
+  test "el sensacionalista exige ademas que el reportaje sea a Dibu Martinez" {
+    const ana = new Periodista(
+      fechaDeIngreso = new Date().minusYears(2),
+      preferencia = sensacionalista
+    )
+    const aDibu = new Reportaje(
+      fechaDePublicacion = new Date(),
+      publicador = null,
+      gradoDeImportancia = 1,
+      titulo = "Un espectacular partido",
+      desarrollo = "Texto.",
+      personaEntrevistada = "Dibu Martínez"
+    )
+    const aOtro = new Reportaje(
+      fechaDePublicacion = new Date(),
+      publicador = null,
+      gradoDeImportancia = 1,
+      titulo = "Un espectacular partido",
+      desarrollo = "Texto.",
+      personaEntrevistada = "María Becerra"
+    )
+    
+    assert.that(ana.prefiere(aDibu))
+    assert.notThat(ana.prefiere(aOtro))
+  }
+  
+  test "el vago mira palabras del desarrollo, no caracteres" {
+    const ana = new Periodista(
+      fechaDeIngreso = new Date().minusYears(2),
+      preferencia = vago
+    )
+    const desarrolloDe30Palabras = (1 .. 30).fold(
+      "",
+      { acc, _ => acc + "x " }
+    ).trim()
+    const treintaPalabras = fabrica.articulo(1, new Date(), [])
+    
+    const largaEnCaracteres = new ArticuloComun(
+      fechaDePublicacion = new Date(),
+      publicador = null,
+      gradoDeImportancia = 1,
+      titulo = "Una noticia",
+      desarrollo = desarrolloDe30Palabras,
+      links = []
+    )
+    
+    assert.that(ana.prefiere(largaEnCaracteres))
+  }
+  
+  test "jose de zer quiere titulos que empiecen con T" {
+    const ana = new Periodista(
+      fechaDeIngreso = new Date().minusYears(2),
+      preferencia = titulosConT
+    )
+    const conT = new ArticuloComun(
+      fechaDePublicacion = new Date(),
+      publicador = null,
+      gradoDeImportancia = 1,
+      titulo = "Todo cambió",
+      desarrollo = "Texto.",
+      links = []
+    )
+    
+    assert.that(ana.prefiere(conT))
+    assert.notThat(ana.prefiere(fabrica.articulo(1, new Date(), [])))
+  }
+}
+
+describe "punto 3 - publicar" {
+  test "no puede publicar mas de 2 no preferidas por dia" {
+    const ana = new Periodista(
+      fechaDeIngreso = new Date(),
+      preferencia = copado
+    )
+    
+    ana.publicar(fabrica.articulo(1, new Date(), []))
+    ana.publicar(fabrica.articulo(1, new Date(), []))
+    
+    assert.throwsException(
+      { ana.publicar(fabrica.articulo(1, new Date(), [])) }
+    )
+  }
+  
+  test "una noticia mal escrita no se puede publicar" {
+    const ana = new Periodista(
+      fechaDeIngreso = new Date(),
+      preferencia = copado
+    )
+    const sinTitulo = new ArticuloComun(
+      fechaDePublicacion = new Date(),
+      publicador = null,
+      gradoDeImportancia = 1,
+      titulo = "",
+      desarrollo = "Texto.",
+      links = []
+    )
+    const sinDesarrollo = new ArticuloComun(
+      fechaDePublicacion = new Date(),
+      publicador = null,
+      gradoDeImportancia = 1,
+      titulo = "Una noticia",
+      desarrollo = "",
+      links = []
+    )
+    
+    assert.throwsException({ ana.publicar(sinTitulo) })
+    assert.throwsException({ ana.publicar(sinDesarrollo) })
+  }
+}
+
+describe "punto 4 - periodistas recientes" {
+  test "entra el reciente que publico, no el viejo ni el que no publico" {
+    const ana = new Periodista(
+      fechaDeIngreso = new Date().minusMonths(6),
+      preferencia = copado
+    )
+    const pablo = new Periodista(
+      fechaDeIngreso = new Date().minusYears(3),
+      preferencia = copado
+    )
+    const clara = new Periodista(
+      fechaDeIngreso = new Date().minusMonths(1),
+      preferencia = copado
+    )
+    
+    ana.publicar(fabrica.articulo(1, new Date().minusDays(1), []))
+    pablo.publicar(fabrica.articulo(1, new Date().minusDays(1), []))
+    
+    const resultado = new Diario(
+      periodistas = [ana, pablo, clara]
+    ).periodistasRecientesQuePublicaronEnLaUltimaSemana()
+    
+    assert.equals(1, resultado.size())
+    assert.equals(ana, resultado.head())
+  }
+}
